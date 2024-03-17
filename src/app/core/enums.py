@@ -33,3 +33,19 @@ class LoggingLevelEnum(Enum):
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
+
+
+class AppTags(Enum):
+    MONITOR: str = "MONITOR"
+    SERVICE: str = "SERVICE"
+    TEST: str = "TEST"
+
+
+class RequestMethod(Enum):
+    GET: str = "GET"
+    POST: str = "POST"
+    PUT: str = "PUT"
+    DELETE: str = "DELETE"
+    PATCH: str = "PATCH"
+    OPTIONS: str = "OPTIONS"
+    HEAD: str = "HEAD"
