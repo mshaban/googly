@@ -1,0 +1,47 @@
+[project]
+name = "googly"
+version = "0.1.0"
+description = "Googly Eyes photo modification web app."
+authors = [{ name = "OPX", email = "shaban@opx.slmail.me" }]
+license = { text = "MIT" }
+readme = "README.md"
+
+
+### DEPENDENCIES ###
+requires-python = "==3.11.*"
+dependencies = [
+  "fastapi>=0.108.0",
+  "ray[serve]>=2.9.3",
+  "opencv-python>=4.9.0.80",
+  "loguru>=0.7.2",
+  "torch[vision]>=2.2.1",
+  "pydantic>=2.6.4",
+  "pydantic-settings>=2.2.1",
+]
+
+### DEV DEPENDENCIES ###
+[tool.pdm.dev-dependencies]
+lint = ["black>=24.3.0", "flake8>=7.0.0"]
+test = [
+  "pytest>=8.1.1",
+  "pytest-cov>=4.1.0",
+  "pytest-mock>=3.12.0",
+  "httpx>=0.27.0",
+]
+jupyter = []
+playground = []
+
+### BUILD CONFIG ###
+[build-system]
+requires = ["pdm-pep517"]
+build-backend = "pdm.pep517.api"
+
+### TEST CONFIG ###
+[tool.pytest.ini_options]
+asgi-lifespan = []
+addopts = ["--import-mode=importlib"]
+pythonpath = ["."]
+
+### SCRIPTS ###
+[project.scripts]
+googly = "runner:main"
