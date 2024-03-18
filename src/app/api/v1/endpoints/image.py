@@ -1,27 +1,24 @@
-from fastapi import File, Response, UploadFile
+from fastapi import File, UploadFile
 from fastapi.responses import StreamingResponse
 from PIL import Image
 import io
 
-
+from src.app.models.image import ImageModel
 from src.app.core.logger import logger
 
 
-async def process_image(image: UploadFile = File(...)) -> StreamingResponse:
+async def process_image(image: UploadFile = File(...)) -> ImageModel:
     """
-    Process the uploaded image file by resizing it to 100x100 pixels and returning a streaming response.
+    Process the uploaded image by resizing it to 100x100 pixels and returning the processed image as a BinaryDataModel.
 
     Parameters:
-    - image (UploadFile): The uploaded image file to be processed.
+    image (UploadFile): The uploaded image file to be processed.
 
     Returns:
-    - StreamingResponse: A streaming response containing the processed image.
+    ImageModel: The processed image data as a BinaryDataModel.
 
     Raises:
-    - None
-
-    This function reads the contents of the uploaded image file, resizes it to 100x100 pixels, and saves it in the original format.
-    The processed image is then returned as a streaming response with the appropriate media type based on the original format.
+    None
     """
     contents = await image.read()
 
@@ -36,41 +33,38 @@ async def process_image(image: UploadFile = File(...)) -> StreamingResponse:
         img.save(img_byte_arr, format=original_format)
         img_byte_arr.seek(0)
 
+        binary_data_model = ImageModel(data=img_byte_arr.read(), format=original_format)
+
         logger.debug(f"Processed image saved: {image.filename}")
 
-        return StreamingResponse(
-            img_byte_arr,
-            media_type=f"image/{original_format.lower()}",
-        )
+        return binary_data_model
 
 
-async def googly(image: UploadFile = File(...)) -> Response:
+async def googly(image: UploadFile = File(...)):
     """
-    Process the uploaded image to add googly eyes and return the modified image.
+    Apply a "googly eyes" effect to the uploaded image and return the modified image as a streaming response.
 
     Parameters:
-    image (UploadFile): The image file to be processed.
+    image (UploadFile): The uploaded image file to apply the effect on.
 
     Returns:
-    Response: The response containing the modified image with googly eyes.
+    StreamingResponse: The modified image with the "googly eyes" effect as a streaming response.
 
     Raises:
-    HTTPException: If there is an issue processing the image.
+    None
     """
-
+    logger.debug(f"Processing image: {image.filename}")
     file_name = image.filename if image.filename else "processed_image.jpg"
-    original_filename_parts = file_name.rsplit(".", 1)
     modified_filename = (
-        f"{original_filename_parts[0]}_googlyed.{original_filename_parts[1]}"
-        if len(original_filename_parts) == 2
+        f"{file_name.rsplit('.', 1)[0]}_googlyed.{file_name.rsplit('.', 1)[1]}"
+        if "." in file_name
         else f"{file_name}_googlyed"
     )
 
-    logger.debug(f"Sending image for processing: {image.filename}")
-    response = await process_image(image)
-    logger.debug(f"Process Image received: {image.filename}")
+    image_model = await process_image(image)
+    img_byte_arr = io.BytesIO(image_model.data)
 
-    response.headers["Content-Disposition"] = (
-        f"attachment; filename={modified_filename}"
+    headers = {"Content-Disposition": f'attachment; filename="{modified_filename}"'}
+    return StreamingResponse(
+        img_byte_arr, media_type=f"image/{image_model.format.lower()}", headers=headers
     )
-    return response
