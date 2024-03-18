@@ -4,10 +4,11 @@ from PIL import Image
 import io
 
 from src.app.models.image import ImageModel
+from src.app.utils.image_utils import create_image_model
 from src.app.core.logger import logger
 
 
-async def process_image(image: UploadFile = File(...)) -> ImageModel:
+async def process_image(image: ImageModel) -> ImageModel:
     """
     Process the uploaded image by resizing it to 100x100 pixels and returning the processed image as a BinaryDataModel.
 
@@ -20,24 +21,30 @@ async def process_image(image: UploadFile = File(...)) -> ImageModel:
     Raises:
     None
     """
-    contents = await image.read()
-
-    logger.debug(f"Processing image: {image.filename}")
-    image_bytes_io = io.BytesIO(contents)
+    image_bytes, original_format = image.data, image.format
+    image_bytes_io = io.BytesIO(image_bytes)
 
     with Image.open(image_bytes_io) as img:
-        original_format = img.format if img.format else "JPEG"
         img = img.resize((100, 100))
 
         img_byte_arr = io.BytesIO()
         img.save(img_byte_arr, format=original_format)
         img_byte_arr.seek(0)
 
-        binary_data_model = ImageModel(data=img_byte_arr.read(), format=original_format)
+        image_model = ImageModel(
+            data=img_byte_arr.read(),
+            format=original_format,
+            filename=(
+                image.modified_filename
+                if image.modified_filename
+                else "processed_image.jpg"
+            ),
+            modified_filename=None,
+        )
 
         logger.debug(f"Processed image saved: {image.filename}")
 
-        return binary_data_model
+        return image_model
 
 
 async def googly(image: UploadFile = File(...)):
@@ -54,17 +61,18 @@ async def googly(image: UploadFile = File(...)):
     None
     """
     logger.debug(f"Processing image: {image.filename}")
-    file_name = image.filename if image.filename else "processed_image.jpg"
-    modified_filename = (
-        f"{file_name.rsplit('.', 1)[0]}_googlyed.{file_name.rsplit('.', 1)[1]}"
-        if "." in file_name
-        else f"{file_name}_googlyed"
-    )
 
-    image_model = await process_image(image)
-    img_byte_arr = io.BytesIO(image_model.data)
+    logger.debug(f"Creating image model: {image.filename}")
 
-    headers = {"Content-Disposition": f'attachment; filename="{modified_filename}"'}
+    image_model = await create_image_model(image)
+    processed_image = await process_image(image_model)
+    processed_bytes_io = io.BytesIO(processed_image.data)
+
+    headers = {
+        "Content-Disposition": f'attachment; filename="{processed_image.filename}"'
+    }
     return StreamingResponse(
-        img_byte_arr, media_type=f"image/{image_model.format.lower()}", headers=headers
+        processed_bytes_io,
+        media_type=f"image/{image_model.format.lower()}",
+        headers=headers,
     )
