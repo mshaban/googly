@@ -2,6 +2,7 @@ from fastapi import File, UploadFile
 import io
 
 from src.app.models.image import ImageModel
+from src.app.core.enums import ImageFormatEnum
 from src.app.core.logger import logger
 
 
@@ -17,7 +18,7 @@ def save_image_from_bytes(image_bytes: bytes, file_path: str) -> None:
         image_file.write(image_bytes)
 
 
-def get_image_format_from_bytes(image_bytes: bytes) -> str:
+def get_image_format_from_bytes(image_bytes: bytes) -> ImageFormatEnum:
     """Determines the image format by checking the magic number in the bytes array.
 
     Args:
@@ -29,14 +30,14 @@ def get_image_format_from_bytes(image_bytes: bytes) -> str:
     # Magic numbers for different image formats
     # Each tuple contains the byte signature and its associated format
     signatures = [
-        (b"\xFF\xD8\xFF", "JPEG"),
-        (b"\x89PNG\r\n\x1A\n", "PNG"),
-        (b"GIF87a", "GIF"),
-        (b"GIF89a", "GIF"),
-        (b"BM", "BMP"),
-        (b"II*\x00", "TIFF"),
-        (b"MM\x00*", "TIFF"),
-        (b"\x00\x00\x01\x00", "ICO"),
+        (b"\xFF\xD8\xFF", ImageFormatEnum.JPEG),
+        (b"\x89PNG\r\n\x1A\n", ImageFormatEnum.PNG),
+        (b"GIF87a", ImageFormatEnum.GIF),
+        (b"GIF89a", ImageFormatEnum.GIF),
+        (b"BM", ImageFormatEnum.BMP),
+        (b"II*\x00", ImageFormatEnum.TIFF),
+        (b"MM\x00*", ImageFormatEnum.TIFF),
+        (b"\x00\x00\x01\x00", ImageFormatEnum.ICO),
     ]
 
     # Only need to check the first 16 bytes
@@ -46,7 +47,7 @@ def get_image_format_from_bytes(image_bytes: bytes) -> str:
         if file_header.startswith(signature):
             return format_name
 
-    return "Unknown"
+    return ImageFormatEnum.UNKNOWN
 
 
 async def create_image_model(image: UploadFile = File(...)) -> ImageModel:
@@ -66,10 +67,9 @@ async def create_image_model(image: UploadFile = File(...)) -> ImageModel:
     This function reads the contents of the provided UploadFile object, creates an ImageModel object with the image data,
     and returns it. It also logs the size of the image data at different stages of processing.
     """
+    logger.debug(f"Creating image model: {image.filename}")
     contents = await image.read()
-    logger.debug(f"image size: {len(contents)}")
     image_bytes_io = io.BytesIO(contents).read()
-    logger.debug(f"image size: {len(image_bytes_io)}")
     file_name = image.filename if image.filename else "processed_image.jpg"
     modified_filename = (
         f"{file_name.rsplit('.', 1)[0]}_googlyed.{file_name.rsplit('.', 1)[1]}"
@@ -77,12 +77,11 @@ async def create_image_model(image: UploadFile = File(...)) -> ImageModel:
         else f"{file_name}_googlyed"
     )
     image_format = get_image_format_from_bytes(image_bytes_io)
-    logger.debug(f"image size: {len(image_bytes_io)}")
     image_model = ImageModel(
         filename=file_name,
         data=image_bytes_io,
         format=image_format,
         modified_filename=modified_filename,
     )
-
+    logger.debug(f"Image model created: {image_model.filename}")
     return image_model

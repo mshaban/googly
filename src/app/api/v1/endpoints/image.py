@@ -28,7 +28,7 @@ async def process_image(image: ImageModel) -> ImageModel:
         img = img.resize((100, 100))
 
         img_byte_arr = io.BytesIO()
-        img.save(img_byte_arr, format=original_format)
+        img.save(img_byte_arr, format=original_format.value)
         img_byte_arr.seek(0)
 
         image_model = ImageModel(
@@ -73,6 +73,6 @@ async def googly(image: UploadFile = File(...)):
     }
     return StreamingResponse(
         processed_bytes_io,
-        media_type=f"image/{image_model.format.lower()}",
+        media_type=f"image/{image_model.format.value.lower()}",
         headers=headers,
     )
