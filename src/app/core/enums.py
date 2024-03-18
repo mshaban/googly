@@ -49,3 +49,13 @@ class RequestMethod(Enum):
     PATCH: str = "PATCH"
     OPTIONS: str = "OPTIONS"
     HEAD: str = "HEAD"
+
+
+class ImageFormatEnum(Enum):
+    JPEG: str = "JPEG"
+    PNG: str = "PNG"
+    GIF: str = "GIF"
+    BMP: str = "BMP"
+    TIFF: str = "TIFF"
+    ICO: str = "ICO"
+    UNKNOWN: str = "UNKNOWN"
