@@ -2,6 +2,7 @@ from src.app.models.features import FaceModel, EyeModel
 from src.app.models.base_models import EyeInferModel, FaceInferModel
 from abc import ABC
 import cv2
+from src.app.core.logger import logger
 
 import numpy as np
 
@@ -31,6 +32,7 @@ class BaseVinoModel(ABC):
         if image.ndim != 3:
             raise ValueError("Image must be 3D")
 
+        # logger.info(f"image shape {image.shape}")
         input_height, input_width = input_shape
         image = cv2.resize(image, (input_width, input_height))
         image = image.transpose((2, 0, 1))
@@ -63,9 +65,10 @@ class VinoFaceInferModel(FaceInferModel, BaseVinoModel):
         """
 
         # Preprocess the image for the face detection model
-        face_input_layer, face_output_layer, compiled_face_model = self.model_artifacts
+        face_input_layer, face_output_layer, compiled_face_model = self.artifacts
         target_shape = (face_input_layer.shape[2], face_input_layer.shape[3])
         preprocessed_image = self.preprocess_image(img, target_shape)
+        # logger.info(f"preprocess shape {preprocessed_image.shape}")
 
         # Perform inference
         results = compiled_face_model([preprocessed_image])[face_output_layer]
@@ -75,14 +78,13 @@ class VinoFaceInferModel(FaceInferModel, BaseVinoModel):
         height, width = img.shape[:2]
         faces = [
             FaceModel(
-                xmin=int(face[-4] * width),
-                ymin=int(face[-3] * height),
-                xmax=int(face[-2] * width),
-                ymax=int(face[-1] * height),
+                xmin=int(max(0, (face[-4] * width))),
+                ymin=int(max(0, (face[-3] * height))),
+                xmax=int(min(width, (face[-2] * width))),
+                ymax=int(min(height, (face[-1] * height))),
             )
             for face in results
         ]
-
         return faces
 
     def filter_faces(self, faces, threshold=0.5):
@@ -124,7 +126,7 @@ class VinoEyeInferModel(EyeInferModel, BaseVinoModel):
         based on the provided face coordinates.
         """
 
-        eye_input_layer, eye_output_layer, compiled_eye_model = self.model_artifacts
+        eye_input_layer, eye_output_layer, compiled_eye_model = self.artifacts
         target_shape = (eye_input_layer.shape[2], eye_input_layer.shape[3])
 
         # Get the eyes for each face

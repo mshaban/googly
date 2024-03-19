@@ -8,11 +8,12 @@ from src.app.core.logger import logger
 from src.app.models.features import EyeModel, FaceModel
 from src.app.models.image import ImageModel
 from src.app.models.model_registery import ModelRegistry
+from src.app.utils.image_utils import load_image_from_bytes
 
 
 class InferenceModel(ABC, BaseModel):
     name: str
-    model_artifacts: Optional[Any] = None
+    artifacts: Optional[Any] = None
     registery: ModelRegistry = ModelRegistry()
 
     class Config:
@@ -38,7 +39,7 @@ class InferenceModel(ABC, BaseModel):
         fetch_model method and then calls the model_post_init method of the
         parent class using super().
         """
-        self.model_artifacts = self.fetch_model()
+        self.artifacts = self.fetch_model()
         super().model_post_init(*args, **kwargs)
 
     def fetch_model(self):
@@ -78,7 +79,7 @@ class InferenceModel(ABC, BaseModel):
         pass
 
     @abstractmethod
-    def predict(self, data: Any) -> Any | list[Any]:
+    def predict(self, request: Any) -> Any | list[Any]:
         """Define the prediction logic for the model"""
         pass
 
@@ -93,12 +94,12 @@ class FaceInferModel(InferenceModel):
     def output_schema(self) -> Type[FaceModel]:
         return FaceModel
 
-    def predict(self, data: ImageModel) -> list[FaceModel]:
+    def predict(self, request: ImageModel) -> list[FaceModel]:
         """
         Predicts the faces present in the given image data.
 
         Parameters:
-        - data (ImageModel): An ImageModel object containing the image data to be processed.
+        - request (ImageModel): An ImageModel object containing the image data to be processed.
 
         Returns:
         - list[FaceModel]: A list of FaceModel objects representing the detected faces in the image.
@@ -108,13 +109,15 @@ class FaceInferModel(InferenceModel):
         - RuntimeError: If there is an issue with detecting faces in the image.
         """
 
-        image = np.array(data.image)
-        logger.info(f"Detecting faces on {data.filename}")
+        image = load_image_from_bytes(request.data)
+        logger.info(f"Detecting faces on {request.filename}")
 
         try:
-            return self.detect(image)
+            faces = self.detect(image)
+            logger.info(f"Detected {len(faces)} faces in the {request.filename}.")
+            return faces
         except Exception as e:
-            logger.error(f"Error detecting faces in the image {data.filename}: {e}")
+            logger.error(f"Error detecting faces in the image {request.filename}: {e}")
             raise RuntimeError("Error detecting faces in the image") from e
 
     @abstractmethod
@@ -135,13 +138,13 @@ class EyeInferModel(InferenceModel, ABC):
 
     def predict(
         self,
-        data: ImageModel,
+        request: ImageModel,
     ) -> list[EyeModel]:
         """
         Predicts the location of eyes in the given image.
 
         Parameters:
-        - data (ImageModel): An ImageModel object containing the image data to be processed.
+        - request (ImageModel): An ImageModel object containing the image data to be processed.
 
         Returns:
         - list[EyeModel]: A list of EyeModel objects representing the predicted locations of eyes in the image.
@@ -151,12 +154,14 @@ class EyeInferModel(InferenceModel, ABC):
         - RuntimeError: If there is an issue with detecting eyes in the image.
         """
 
-        image = np.array(data.image)
-        logger.info(f"Detecting eyes on {data.filename}")
+        image = load_image_from_bytes(request.data)
+        logger.info(f"Detecting eyes on {request.filename}")
         try:
-            return self.detect(image, self.faces)
+            eyes = self.detect(image, self.faces)
+            logger.info(f"Detected {len(eyes)} eyes in the {request.filename}.")
+            return eyes
         except Exception as e:
-            logger.error(f"Error detecting eyes in the image {data.filename}: {e}")
+            logger.error(f"Error detecting eyes in the image {request.filename}: {e}")
             raise RuntimeError("Error detecting eyes in the image") from e
 
     @abstractmethod
