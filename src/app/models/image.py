@@ -1,6 +1,8 @@
 from pydantic import BaseModel, validator
 import numpy as np
 import cv2
+from PIL import Image
+from io import BytesIO
 
 from src.app.core.enums import ImageFormatEnum
 
@@ -17,9 +19,6 @@ class ImageModel(BaseModel):
             raise ValueError("Unknown image format")
         return value
 
-    @property
-    def image(self):
-        image_array = np.frombuffer(self.data, np.uint8)
-        # Decode the array into an image
-        image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
-        return image
+    def model_post_init(self, *args, **kwargs):
+        self.modified_filename = f"googly_{self.filename}"
+        super().model_post_init(*args, **kwargs)

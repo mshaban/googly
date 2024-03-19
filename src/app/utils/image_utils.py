@@ -1,10 +1,9 @@
-import cv2
-from fastapi import File, UploadFile
 import io
 
-from src.app.models.image import ImageModel
+import numpy as np
+from PIL import Image
+
 from src.app.core.enums import ImageFormatEnum
-from src.app.core.logger import logger
 
 from src.app.models.features import FaceModel, EyeModel
 
@@ -19,6 +18,28 @@ def save_image_from_bytes(image_bytes: bytes, file_path: str) -> None:
     """
     with open(file_path, "wb") as image_file:
         image_file.write(image_bytes)
+
+
+def save_image_from_array(image_array: np.ndarray, file_path: str) -> None:
+    """
+    Saves an image array to a file, converting from BGR to RGB format if necessary.
+
+    Args:
+        image_array: The NumPy array containing the image data in BGR format.
+        file_path: The path where the image should be saved, including the filename and extension.
+    """
+
+    # Check if the image has 3 channels (color image)
+    if image_array.ndim == 3 and image_array.shape[2] == 3:
+        # Convert from BGR to RGB
+        image_array = image_array[:, :, [2, 1, 0]]
+
+    # Ensure the array is of type uint8
+    if image_array.dtype != np.uint8:
+        image_array = np.clip(image_array, 0, 255).astype(np.uint8)
+
+    image = Image.fromarray(image_array)
+    image.save(file_path)
 
 
 def get_image_format_from_bytes(image_bytes: bytes) -> ImageFormatEnum:
@@ -53,41 +74,38 @@ def get_image_format_from_bytes(image_bytes: bytes) -> ImageFormatEnum:
     return ImageFormatEnum.UNKNOWN
 
 
-async def create_image_model(image: UploadFile = File(...)) -> ImageModel:
+def load_image_from_bytes(image_bytes: bytes, with_alpha: bool = False) -> np.ndarray:
     """
-    Asynchronously creates an ImageModel object from the provided UploadFile object.
+    Load an image from bytes and convert it to a NumPy array in OpenCV format.
 
     Parameters:
-    - image (UploadFile): The UploadFile object containing the image data.
+    image_bytes (bytes): The bytes representing the image data.
+    with_alpha (bool): Flag indicating whether to include an alpha channel. Default is False.
 
     Returns:
-    - ImageModel: The ImageModel object created from the image data.
+    np.ndarray: The image data as a NumPy array in OpenCV format (BGR).
 
     Raises:
-    - ValueError: If the image data is empty or cannot be read.
-    - IOError: If there is an issue reading the image data.
+    ValueError: If the image_bytes parameter is not of type bytes.
+    IOError: If there is an error loading the image from the bytes.
 
-    This function reads the contents of the provided UploadFile object, creates an ImageModel object with the image data,
-    and returns it. It also logs the size of the image data at different stages of processing.
+    Example:
+    >>> image_data = load_image_from_bytes(image_bytes, with_alpha=True)
     """
-    logger.debug(f"Creating image model: {image.filename}")
-    contents = await image.read()
-    image_bytes_io = io.BytesIO(contents).read()
-    file_name = image.filename if image.filename else "processed_image.jpg"
-    modified_filename = (
-        f"{file_name.rsplit('.', 1)[0]}_googlyed.{file_name.rsplit('.', 1)[1]}"
-        if "." in file_name
-        else f"{file_name}_googlyed"
-    )
-    image_format = get_image_format_from_bytes(image_bytes_io)
-    image_model = ImageModel(
-        filename=file_name,
-        data=image_bytes_io,
-        format=image_format,
-        modified_filename=modified_filename,
-    )
-    logger.debug(f"Image model created: {image_model.filename}")
-    return image_model
+
+    if not isinstance(image_bytes, bytes):
+        raise ValueError("The image_bytes parameter must be of type bytes.")
+
+    try:
+        image = Image.open(io.BytesIO(image_bytes))
+        if with_alpha:
+            image = image.convert("RGBA")
+        else:
+            image = image.convert("RGB")
+        open_cv_image = np.array(image)[:, :, ::-1].copy()
+        return open_cv_image
+    except IOError as e:
+        raise IOError("Error loading image from bytes: {}".format(str(e))) from e
 
 
 def image_path_to_bytes(image_path: str) -> bytes:
@@ -97,74 +115,4 @@ def image_path_to_bytes(image_path: str) -> bytes:
     :param image_path: The file system path to the image file.
     :return: The image file's content as a bytes array.
     """
-    with open(image_path, "rb") as image_file:
-        image_bytes = image_file.read()
-    return image_bytes
-
-
-def draw_annotations(
-    img, eye_coordinates: list[EyeModel], face_coordinates: list[FaceModel]
-):
-    """
-    Draw rectangles around detected faces and circles around detected eyes in the given image.
-
-    Parameters:
-    image_path (str): The file path of the image to process.
-    eye_coordinates (list[EyeModel]): A list of EyeModel objects containing the coordinates of detected eyes.
-    face_coordinates (list[FaceModel]): A list of FaceModel objects containing the coordinates of detected faces.
-
-    Returns:
-    None
-
-    Raises:
-    None
-
-    This function loads the image specified by image_path, draws rectangles
-    around the detected faces using the coordinates provided in
-    face_coordinates, and draws circles around the detected eyes using the
-    coordinates provided in eye_coordinates. The faces are outlined in green
-    and the eyes are circled in blue. The processed image is displayed in a
-    window titled "Faces and Eyes Detected" until a key is pressed, at which
-    point the window is closed.
-    """
-    # Draw rectangles around faces
-    for fc in face_coordinates:
-        xmin, ymin, xmax, ymax = fc.coordinates
-        cv2.rectangle(img, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)  # Draw in green
-
-    # # Draw circles around eyes
-    # for ey in eye_coordinates:
-    #     xmin, ymin, xmax, ymax = ey.coordinates
-    #
-    #     center = (xmin + (xmax - xmin) // 2, ymin + (ymax - ymin) // 2)
-    #     radius = max(xmax - xmin, ymin - ymax) // 5
-    #     cv2.circle(img, center, radius, (255, 0, 0), 2)  # Draw in blue
-    visualize_landmarks(img, eye_coordinates)
-    # Display the image
-    cv2.imshow("Faces and Eyes Detected", img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-
-def visualize_landmarks(image, landmarks):
-    """
-    Visualizes facial landmarks on the given image.
-
-    Parameters:
-    image (numpy.ndarray): The input image on which to visualize the landmarks.
-    results (numpy.ndarray): The array of facial landmarks detected in the image.
-
-    Returns:
-    None
-
-    Raises:
-    None
-    """
-    for l in landmarks:
-        x, y = l.xmin, l.ymin
-        cv2.circle(image, (x, y), 2, (0, 255, 0), -1)
-        x, y = l.xmax, l.ymax
-        cv2.circle(image, (x, y), 2, (0, 255, 0), -1)
-    # cv2.imshow("Facial Landmarks", image)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
+    return open(image_path, "rb").read()
