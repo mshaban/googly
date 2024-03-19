@@ -1,82 +1,82 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from src.app.models.features import EyeModel, FaceModel
 from src.app.models.image import ImageModel
-from src.app.utils.image_utils import load_image_from_bytes
-from src.app.utils.overlay_utils import (
-    overlay_transparent,
-)
-
-from src.app.utils.eye_utils import (
-    calculate_eye_rotation,
-    calculate_googly_center_and_size,
-)
 
 
 class GooglyModel(BaseModel):
-    face: FaceModel
+    faces: list[FaceModel]
     eyes: list[EyeModel]
     input_image: ImageModel
-    googly0: ImageModel
-    googly1: ImageModel
+    googly: ImageModel
 
-    def apply_googly_eyes(self):
+    @model_validator(mode="before")
+    def validate_eyes_faces(cls, values):
         """
-        Apply googly eyes to the input image.
-
-        This function takes the input image and overlays googly eyes on the detected eye regions.
-        It first loads the input image and the googly eye images from bytes.
-        It then iterates over the detected eye regions, calculates the center and size of the googly eye,
-        and the rotation angle based on the eye coordinates.
-        The googly eye image is then overlaid on the input image at the calculated center with the specified size and rotation.
-        The opacity, gamma, overlay bias, and minimum alpha values can also be adjusted for the overlay.
+        Validates the relationship between eyes and faces in a given set of values.
 
         Parameters:
-        - self: The instance of the class containing the input image, googly eye images, and eye regions.
+        cls (class): The class to which this method belongs.
+        values (dict): A dictionary containing the values to be validated, with keys "eyes" and "faces".
 
         Returns:
-        - input_img: The modified image with googly eyes overlaid on the detected eye regions.
+        dict: The validated values dictionary.
 
         Raises:
-        - ValueError: If the input image or googly eye images cannot be loaded.
-        - IndexError: If there are not enough googly eye images for all detected eye regions.
+        ValueError: If the number of eyes is not twice the number of faces, or if any pair of eyes is not within their respective face.
         """
-        # Convert input image from bytes to an OpenCV image
-        input_img = load_image_from_bytes(self.input_image.data)
 
-        input_image_size = input_img.shape[:2]
+        eyes, faces = values["eyes"], values["faces"]
 
-        # Load googly eye images
-        googly_eye_imgs = [
-            load_image_from_bytes(self.googly0.data, with_alpha=True),
-            load_image_from_bytes(self.googly1.data, with_alpha=True),
+        # Check if the number of eyes is twice the number of faces
+        if len(eyes) != 2 * len(faces):
+            raise ValueError("Mismatch between number of eyes and faces")
+
+        # Validate that each pair of eyes is within their respective face in the list
+        for i in range(0, len(eyes) - 1, 2):
+            face_model = faces[i // 2]
+            left_eye, right_eye = eyes[i], eyes[i + 1]
+
+            # Check if both eyes are within the boundaries of the face
+            if not all(
+                [
+                    left_eye.points[0].x >= face_model.xmin,
+                    left_eye.points[0].y >= face_model.ymin,
+                    left_eye.points[1].x <= face_model.xmax,
+                    left_eye.points[1].y <= face_model.ymax,
+                    right_eye.points[0].x >= face_model.xmin,
+                    right_eye.points[0].y >= face_model.ymin,
+                    right_eye.points[1].x <= face_model.xmax,
+                    right_eye.points[1].y <= face_model.ymax,
+                ]
+            ):
+                raise ValueError("Eyes are not within the face")
+
+        return values
+
+    def model_post_init(self, *args, **kwargs):
+        self.eyes = [
+            EyeModel(points=self.normalize_eye_points(eye)) for eye in self.eyes
         ]
 
-        for i, eye in enumerate(self.eyes):
-            googly_eye_img = googly_eye_imgs[i % len(googly_eye_imgs)]
-            if i % 2 == 0:
-                eye.xmin, eye.ymin, eye.xmax, eye.ymax = (
-                    eye.xmax,
-                    eye.ymax,
-                    eye.xmin,
-                    eye.ymin,
-                )
-            center, size = calculate_googly_center_and_size(
-                eye, self.face, input_image_size, i % 2 == 0
-            )
-            rotation = calculate_eye_rotation(eye.coordinates[:2], eye.coordinates[2:])
+        super().model_post_init(*args, **kwargs)
 
-            input_img = overlay_transparent(
-                input_img,
-                googly_eye_img,
-                center,
-                size,
-                rotation=rotation,
-                opacity=1.1,
-                gamma=2.2,
-                overlay_bias=1.2,
-                min_alpha=0.1,
-            )
+    def normalize_eye_points(self, eye_model):
+        """
+        Sorts the eye points in the given eye model by their x-coordinate in ascending order.
 
-        # Optionally, save or further process the modified image
-        return input_img
+        Args:
+        eye_model (EyeModel): The EyeModel object containing the points to be normalized.
+
+        Returns:
+        list: A list of Point objects sorted by their x-coordinate in ascending order.
+
+        Raises:
+        TypeError: If the input eye_model is not of type EyeModel.
+        """
+
+        if not isinstance(eye_model, EyeModel):
+            raise TypeError("Input must be of type EyeModel")
+
+        sorted_points = sorted(eye_model.points, key=lambda point: point.x)
+        return sorted_points

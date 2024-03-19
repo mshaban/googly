@@ -30,5 +30,10 @@ class FaceModel(FaceFeature):
     pass
 
 
-class EyeModel(FaceFeature):
-    pass
+class PointModel(BaseModel):
+    x: int
+    y: int
+
+
+class EyeModel(BaseModel):
+    points: list[PointModel]

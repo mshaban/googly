@@ -62,10 +62,9 @@ def visualize_landmarks(image, landmarks):
     None
     """
     for l in landmarks:
-        x, y = l.xmin, l.ymin
-        cv2.circle(image, (x, y), 2, (0, 255, 0), -1)
-        x, y = l.xmax, l.ymax
-        cv2.circle(image, (x, y), 2, (0, 255, 0), -1)
+        for p in l.points:
+            x, y = p.x, p.y
+            cv2.circle(image, (x, y), 2, (0, 255, 0), -1)
     # cv2.imshow("Facial Landmarks", image)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()

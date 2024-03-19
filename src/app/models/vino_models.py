@@ -1,5 +1,5 @@
-from src.app.models.features import FaceModel, EyeModel
-from src.app.models.base_models import EyeInferModel, FaceInferModel
+from src.app.models.features import FaceModel, EyeModel, PointModel
+from src.app.models.detection_models import EyeInferModel, FaceInferModel
 from abc import ABC
 import cv2
 from src.app.core.logger import logger
@@ -180,22 +180,27 @@ class VinoEyeInferModel(EyeInferModel, BaseVinoModel):
         results = compiled_eye_model([preprocessed_face])[eye_output_layer]
         results = results[0].reshape(-1, 2)
 
-        # Filter landmarks for the eyes and extract left and right eye coordinates
-        eyes_only = results[:4]
-        left_eye = eyes_only[:2]
-        right_eye = eyes_only[2:]
+        left_eye_indices = [0, 1]  # Corners of the left eye
+        right_eye_indices = [2, 3]  # Corners of the right eye
+        left_eyebrow_indices = [12, 13, 14]  # Points for the left eyebrow
+        right_eyebrow_indices = [15, 16, 17]  # Points for the right eyebrow
 
+        # Helper function to create PointModels
+        def create_point_models(indices):
+            return [
+                PointModel(
+                    x=int(results[i][0] * face_width + xmin),
+                    y=int(results[i][1] * face_height + ymin),
+                )
+                for i in indices
+            ]
+
+        # Construct EyeModels with eyebrow points
         left_eye_model = EyeModel(
-            xmin=int(left_eye[0][0] * face_width + xmin),
-            ymin=int(left_eye[0][1] * face_height + ymin),
-            xmax=int(left_eye[1][0] * face_width + xmin),
-            ymax=int(left_eye[1][1] * face_height + ymin),
+            points=create_point_models(left_eye_indices + left_eyebrow_indices)
         )
         right_eye_model = EyeModel(
-            xmin=int(right_eye[0][0] * face_width + xmin),
-            ymin=int(right_eye[0][1] * face_height + ymin),
-            xmax=int(right_eye[1][0] * face_width + xmin),
-            ymax=int(right_eye[1][1] * face_height + ymin),
+            points=create_point_models(right_eye_indices + right_eyebrow_indices)
         )
 
         return left_eye_model, right_eye_model

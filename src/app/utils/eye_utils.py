@@ -2,35 +2,33 @@ import random
 
 import numpy as np
 
-from src.app.models.features import EyeModel, FaceModel
+from src.app.models.features import FaceModel
 
 
-def find_centroid(p1: tuple, p2: tuple) -> tuple:
+def find_centroid(points: list) -> np.ndarray:
     """
-    Calculate the centroid of two points in 2D space.
+    Calculate the centroid of a list of points.
 
     Parameters:
-    p1 (tuple): A tuple representing the coordinates of the first point.
-    p2 (tuple): A tuple representing the coordinates of the second point.
+    points (list): A list of points in the form of [x, y, z] coordinates.
 
     Returns:
-    tuple: A tuple representing the coordinates of the centroid of the two points.
+    np.ndarray: The centroid of the points as a numpy array in the form [x, y, z].
 
     Raises:
-    ValueError: If the input points are not in the correct format (i.e., not tuples).
+    ValueError: If the input points list is empty or if the points are not in the correct format.
     """
 
-    # Check if input points are tuples
-    if not isinstance(p1, tuple) or not isinstance(p2, tuple):
-        raise ValueError("Input points must be tuples")
+    if not points:
+        raise ValueError("Input points list is empty")
 
     # Convert points to numpy array
-    points = np.array([p1, p2])
+    points_array = np.array(points)
 
     # Calculate centroid
-    centroid = np.mean(points, axis=0).astype(int)
+    centroid = np.mean(points_array, axis=0).astype(int)
 
-    return tuple(centroid)
+    return centroid
 
 
 def calculate_eye_rotation(left_corner, right_corner):
@@ -57,107 +55,169 @@ def calculate_eye_rotation(left_corner, right_corner):
     return angle_degrees
 
 
-def calculate_center_shift(
-    eye_index: int, face_feature: np.ndarray, image_size: tuple[int, int]
-) -> tuple[int, int]:
+def calculate_eye_center(eye_model):
     """
-    Calculate the shift needed to center the face feature in the image.
+    Calculate the center of the eye.
 
     Parameters:
-    eye_index (int): Index of the eye used to calculate the shift.
-    face_feature (np.array): Array representing the face feature to be centered.
-    image_size (Tuple[int, int]): Tuple containing the width and height of the image.
+    eye_model (EyeModel): An instance of the EyeModel class containing the points of the eye.
 
     Returns:
-    Tuple[int, int]: A tuple containing the shift values in the x and y directions.
+    tuple: A tuple containing the x and y coordinates of the center of the eye.
 
     Raises:
-    ValueError: If the face_feature array is empty.
+    ValueError: If the eye_model is empty or does not contain any points.
     """
 
-    # Calculate the scale factor based on the image size
-    scale_factor = face_feature.size / max(image_size)
+    # Extract x and y coordinates from the points in the eye_model
+    x_coords = [point.x for point in eye_model.points]
+    y_coords = [point.y for point in eye_model.points]
 
-    # Calculate the maximum shift values based on the scale factor
-    max_shift_x = int(scale_factor * 20)
-    max_shift_y = int(scale_factor * 10)
+    # Calculate the centroid of x and y coordinates to find the center of the eye
+    center_x = find_centroid(x_coords)
+    center_y = find_centroid(y_coords)
 
-    # Generate random shift values within the maximum shift limits
-    shift_x = random.randint(-max_shift_x, max_shift_x) * (eye_index // 2)
-    shift_y = random.randint(-max_shift_y, max_shift_y) * (eye_index // 2)
+    return center_x, center_y
 
-    return (shift_x, shift_y)
+
+def estimate_eye_size(eye_model):
+    """
+    Estimate the size of an eye based on a model of its points.
+
+    Parameters:
+    eye_model (EyeModel): A model of the eye containing a list of points.
+
+    Returns:
+    float: The estimated size of the eye, calculated as the maximum distance between any two points in the model.
+
+    Raises:
+    ValueError: If the eye_model is empty or does not contain enough points to calculate the size.
+    """
+
+    if not eye_model.points:
+        raise ValueError(
+            "The eye_model must contain at least one point to calculate the size."
+        )
+
+    x_coords = [point.x for point in eye_model.points]
+    y_coords = [point.y for point in eye_model.points]
+    distances = [
+        np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+        for x1, y1 in zip(x_coords, y_coords)
+        for x2, y2 in zip(x_coords, y_coords)
+    ]
+    return max(distances)
+
+
+def adjust_size_based_on_proportions(
+    size: int, face_model: FaceModel, image_size: tuple[int, int]
+) -> int:
+    """
+    Adjusts the size based on proportions of the face model and the image size.
+
+    Parameters:
+    size (int): The initial size to be adjusted.
+    face_model (FaceModel): The face model object containing information about the face.
+    image_size (Tuple[int, int]): The size of the image as a tuple of width and height.
+
+    Returns:
+    int: The adjusted size based on the proportions of the face model and image size.
+
+    Raises:
+    None
+    """
+    image_width, image_height = image_size
+    proportion_of_image = 0.001
+    base_size_from_image = int(min(image_width, image_height) * proportion_of_image)
+    proportion_of_face = 0.4
+    size_from_face = int(face_model.size * proportion_of_face)
+    adjusted_size = int((base_size_from_image + size_from_face + size) / 3)
+    return adjusted_size
+
+
+def apply_dynamic_increase(size):
+    """
+    Apply a dynamic increase factor to the given size.
+
+    Parameters:
+    size (int): The original size to be increased.
+
+    Returns:
+    int: The size after applying the dynamic increase factor.
+
+    Raises:
+    None
+
+    Example:
+    >>> apply_dynamic_increase(100)
+    110
+    """
+    dynamic_increase_factor = random.uniform(0.9, 1.1)
+    return int(size * dynamic_increase_factor)
+
+
+def apply_corrective_shifts(center: tuple, size: int, positive_shift: bool) -> tuple:
+    """
+    Apply corrective shifts based on the positive_shift flag.
+
+    Parameters:
+    center (tuple): A tuple representing the center point as (x, y).
+    size (int): The size of the shift factor.
+    positive_shift (bool): A flag indicating whether the shift should be positive or negative.
+
+    Returns:
+    tuple: A tuple representing the corrected center point after applying the shifts.
+
+    Raises:
+    None
+
+    Example:
+    >>> apply_corrective_shifts((5, 5), 10, True)
+    (15, 15)
+    """
+    shift_factor = 0.0  # Adjust this as needed
+    x_shift = int(shift_factor * size) if positive_shift else -int(shift_factor * size)
+    y_shift = int(shift_factor * size) if positive_shift else -int(shift_factor * size)
+    corrected_center = (int(center[0]) + x_shift, int(center[1]) + y_shift)
+    return corrected_center
 
 
 def calculate_googly_center_and_size(
-    eye_feature: EyeModel,
-    face_feature: FaceModel,
-    image_size: tuple[int, int],
-    positive_shift: bool = True,
-) -> tuple[tuple[int, int], int]:
+    eye_model, face_model, image_size, positive_shift=True
+):
     """
-    Calculate the center point and size for a googly eye based on the provided eye and face features.
+    Calculate the center and size of a googly eye based on the eye model, face model, and image size.
 
     Parameters:
-    - eye_feature (EyeModel): The model representing the eye feature.
-    - face_feature (FaceModel): The model representing the face feature.
-    - image_size (tuple[int, int]): A tuple representing the size of the image in pixels.
-    - positive_shift (bool, optional): A flag indicating whether to apply a positive shift for the centroid. Default is True.
+    - eye_model (EyeModel): The model representing the googly eye.
+    - face_model (FaceModel): The model representing the face.
+    - image_size (tuple): A tuple of two integers representing the size of the image.
+    - positive_shift (bool): A flag indicating whether to apply a positive shift to the center (default is True).
 
     Returns:
-    - tuple[tuple[int, int], int]: A tuple containing the corrected center point coordinates and the size of the googly eye.
+    - tuple: A tuple containing the corrected center coordinates and the size of the googly eye.
 
     Raises:
     - ValueError: If the image_size is not a tuple of two integers.
-    - TypeError: If eye_feature is not of type EyeModel or face_feature is not of type FaceModel.
+    - ValueError: If the corrected center x coordinate is outside the face region.
     """
 
-    if (
-        not isinstance(image_size, tuple)
-        or len(image_size) != 2
-        or not all(isinstance(i, int) for i in image_size)
-    ):
+    # Validate image_size
+    if not (isinstance(image_size, tuple) and len(image_size) == 2):
         raise ValueError("Image size must be a tuple of two integers.")
 
-    if not isinstance(eye_feature, EyeModel):
-        raise TypeError("eye_feature must be of type EyeModel.")
+    center_x, center_y = calculate_eye_center(eye_model)
+    max_distance = estimate_eye_size(eye_model)
+    size = adjust_size_based_on_proportions(max_distance, face_model, image_size)
+    size = apply_dynamic_increase(size)
+    size = size + size % 2
 
-    if not isinstance(face_feature, FaceModel):
-        raise TypeError("face_feature must be of type FaceModel.")
-
-    image_width, image_height = image_size
-    proportion_of_image = 0.001
-
-    # Calculate base size using the image size
-    base_size_from_image = int(min(image_width, image_height) * proportion_of_image)
-
-    # Adjust the base size based on the face size, if available
-    proportion_of_face = 0.3
-    size_from_face = int(face_feature.size * proportion_of_face)
-
-    # Blend the size based on the image and face sizes
-    size = int((base_size_from_image + size_from_face) / 2)
-
-    # Apply a dynamic increase to the size based on some criteria, for example, randomness
-    dynamic_increase_factor = random.uniform(0.9, 1.1)
-    size = int(size * dynamic_increase_factor)
-
-    # Ensure the size is even for simplicity in further calculations
-    size += size % 2
-
-    # Calculate the center point between the two eye coordinates
-    center = find_centroid(
-        (eye_feature.xmin, eye_feature.ymin), (eye_feature.xmax, eye_feature.ymax)
+    corrected_center = apply_corrective_shifts(
+        (center_x, center_y), size, positive_shift
     )
 
-    # Calculate corrective shifts
-    eye_height = eye_feature.ymax - eye_feature.ymin
-    eye_width = eye_feature.xmax - eye_feature.xmin
-
-    # Apply shifts. Positive shifts move the centroid down and to the right; negative shifts do the opposite.
-    y_shift = int(-eye_height * 0.4) if positive_shift else int(eye_height * 0.9)
-    x_shift = int(-eye_width * 0.4) if positive_shift else int(eye_width * 0.8)
-
-    corrected_center = (center[0] + x_shift, center[1] + y_shift)
+    # Assert that centroid is within face region
+    if not (face_model.xmin < corrected_center[0] < face_model.xmax):
+        raise ValueError("Corrected center x coordinate is outside face region")
 
     return corrected_center, size
