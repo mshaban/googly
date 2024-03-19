@@ -65,6 +65,7 @@ class GooglyModel(BaseModel):
                 eye, self.face, input_image_size, i % 2 == 0
             )
             rotation = calculate_eye_rotation(eye.coordinates[:2], eye.coordinates[2:])
+
             input_img = overlay_transparent(
                 input_img,
                 googly_eye_img,
@@ -73,6 +74,8 @@ class GooglyModel(BaseModel):
                 rotation=rotation,
                 opacity=1.1,
                 gamma=2.2,
+                overlay_bias=1.2,
+                min_alpha=0.1,
             )
 
         # Optionally, save or further process the modified image
