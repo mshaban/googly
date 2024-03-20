@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from src.app.core.logger import logger
 from src.app.models.features import EyeModel, FaceModel
 from src.app.models.image import ImageModel
-from src.app.models.model_registery import ModelRegistry
 from src.app.utils.image_utils import load_image_from_bytes
 
 
@@ -87,7 +86,7 @@ class EyeInferModel(InferenceModel, ABC):
     def output_schema(self) -> Type[EyeModel]:
         return EyeModel
 
-    def predict(self, request: ImageModel, *args) -> list[EyeModel]:
+    def predict(self, request: ImageModel, faces: list[FaceModel]) -> list[EyeModel]:
         """
         Predicts the location of eyes in the given image.
 
@@ -101,7 +100,6 @@ class EyeInferModel(InferenceModel, ABC):
         - ValueError: If the image data is not in a valid format.
         - RuntimeError: If there is an issue with detecting eyes in the image.
         """
-        faces = args[0]
         image = load_image_from_bytes(request.data)
         logger.info(f"Detecting eyes on {request.filename}")
         try:

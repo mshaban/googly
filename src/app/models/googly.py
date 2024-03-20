@@ -2,6 +2,7 @@ from pydantic import BaseModel, model_validator
 
 from src.app.models.features import EyeModel, FaceModel
 from src.app.models.image import ImageModel
+from src.app.core.logger import logger
 
 
 class GooglyModel(BaseModel):
@@ -30,6 +31,7 @@ class GooglyModel(BaseModel):
 
         # Check if the number of eyes is twice the number of faces
         if len(eyes) != 2 * len(faces):
+            logger.error(f"eyes: {len(eyes)} faces: {len(faces)}")
             raise ValueError("Mismatch between number of eyes and faces")
 
         # Validate that each pair of eyes is within their respective face in the list
