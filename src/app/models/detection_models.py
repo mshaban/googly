@@ -13,58 +13,10 @@ from src.app.utils.image_utils import load_image_from_bytes
 
 class InferenceModel(ABC, BaseModel):
     name: str
-    artifacts: Optional[Any] = None
-    registery: ModelRegistry = ModelRegistry()
+    artifacts: Optional[Any]
 
     class Config:
         arbitrary_types_allowed = True
-
-    def model_post_init(self, *args, **kwargs):
-        """
-        Initializes the model by fetching model artifacts and calling the
-        parent class's model_post_init method.
-
-        Parameters:
-        - self: the instance of the class
-        - *args: variable length argument list
-        - **kwargs: keyword arguments
-
-        Returns:
-        - None
-
-        Raises:
-        - No specific exceptions are raised by this method
-
-        This method initializes the model by fetching model artifacts using the
-        fetch_model method and then calls the model_post_init method of the
-        parent class using super().
-        """
-        self.artifacts = self.fetch_model()
-        super().model_post_init(*args, **kwargs)
-
-    def fetch_model(self):
-        """
-        Fetches a model from the registry based on the name provided.
-
-        Parameters:
-        - self: The instance of the class.
-
-        Returns:
-        - model: The model fetched from the registry based on the name.
-
-        Raises:
-        - ValueError: If the model with the provided name is not found in the registry.
-
-        This method fetches a model from the registry based on the name
-        provided. It first checks if the model exists in the registry. If the
-        model is not found, it logs an error message and raises a ValueError.
-        Otherwise, it returns the fetched model.
-        """
-        model = self.registery.get_model(self.name)
-        if not model:
-            logger.error(f"Model {self.name} not found in registry.")
-            raise ValueError("Model not found in registry.")
-        return model
 
     @property
     @abstractmethod
@@ -79,7 +31,7 @@ class InferenceModel(ABC, BaseModel):
         pass
 
     @abstractmethod
-    def predict(self, request: Any) -> Any | list[Any]:
+    def predict(self, request: Any, *args) -> Any | list[Any]:
         """Define the prediction logic for the model"""
         pass
 
@@ -94,7 +46,7 @@ class FaceInferModel(InferenceModel):
     def output_schema(self) -> Type[FaceModel]:
         return FaceModel
 
-    def predict(self, request: ImageModel) -> list[FaceModel]:
+    def predict(self, request: ImageModel, *args) -> list[FaceModel]:
         """
         Predicts the faces present in the given image data.
 
@@ -126,7 +78,6 @@ class FaceInferModel(InferenceModel):
 
 
 class EyeInferModel(InferenceModel, ABC):
-    faces: list[FaceModel]
 
     @property
     def input_schema(self) -> Type[ImageModel]:
@@ -136,10 +87,7 @@ class EyeInferModel(InferenceModel, ABC):
     def output_schema(self) -> Type[EyeModel]:
         return EyeModel
 
-    def predict(
-        self,
-        request: ImageModel,
-    ) -> list[EyeModel]:
+    def predict(self, request: ImageModel, *args) -> list[EyeModel]:
         """
         Predicts the location of eyes in the given image.
 
@@ -153,11 +101,11 @@ class EyeInferModel(InferenceModel, ABC):
         - ValueError: If the image data is not in a valid format.
         - RuntimeError: If there is an issue with detecting eyes in the image.
         """
-
+        faces = args[0]
         image = load_image_from_bytes(request.data)
         logger.info(f"Detecting eyes on {request.filename}")
         try:
-            eyes = self.detect(image, self.faces)
+            eyes = self.detect(image, faces)
             logger.info(f"Detected {len(eyes)} eyes in the {request.filename}.")
             return eyes
         except Exception as e:
