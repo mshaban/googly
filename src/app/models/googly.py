@@ -1,8 +1,7 @@
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 
 from src.app.models.features import EyeModel, FaceModel
 from src.app.models.image import ImageModel
-from src.app.core.logger import logger
 
 
 class GooglyModel(BaseModel):

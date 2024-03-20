@@ -1,19 +1,24 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from src.app.core.enums import LoggingLevelEnum, ModeEnum
 
 
 class FastAPISettings(BaseSettings):
     """
-    A class to define settings for FastAPI configuration.
+    A class to store settings for a FastAPI application.
+
     Attributes:
-    - APP_NAME: str - the name of the FastAPI application (default: FastAPI)
-    - HOST: str - the host for the FastAPI application (default: localhost)
-    - PORT: int - the port for the FastAPI application (default: 8000)
+    - APP_NAME (str): The name of the FastAPI application.
+    - FAST_HOST (str): The host address for the FastAPI application.
+    - FAST_PORT (int): The port number for the FastAPI application.
+    - API_VERSION (str): The version of the API.
+    - model_config (SettingsConfigDict): A dictionary to store model configuration settings.
     """
 
     APP_NAME: str = "FastAPI"
-    HOST: str = "localhost"
-    PORT: int = 8000
+    FAST_HOST: str = "localhost"
+    FAST_PORT: int = 8888
+    FAST_ENDPOINT: str = "googly"
     API_VERSION: str = "v1"
 
     model_config = SettingsConfigDict(extra="ignore")
@@ -47,27 +52,30 @@ class LoggerSettings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
 
-class RayServeSettings(BaseSettings):
-    SERVE_URL: str = "http://localhost:8000"
-    SERVE_ENDPOINT: str = "googly"
-
-
 class Settings(BaseSettings):
     """
-    A class representing the settings for the application.
+    A class to store settings for a project.
 
     Attributes:
     - PROJECT_NAME (str): The name of the project.
-    - MODE (ModeEnum): The mode in which the application is running (DEV, PROD, etc.).
-    - API_VERSION (str): The version of the API.
-    - FASTAPI (FastAPISettings): Settings related to the FastAPI framework.
-    - LOGGER (LoggerSettings): Settings related to logging.
-    - RAY_SERVE (RayServeSettings): Settings related to Ray Serve.
+    - MODE (ModeEnum): The mode of the project.
+    - FASTAPI (FastAPISettings): Settings for FastAPI.
+    - LOGGER (LoggerSettings): Settings for the logger.
+    - SERVE_HOST (str): The host for serving the project.
+    - SERVE_ENDPOINT (str): The endpoint for serving the project.
+    - SERVE_PORT (int): The port for serving the project.
+    - GOOGLY_PATH (str): The path to the googly image.
 
     Configurations:
-    - env_file (str): The path to the .env file.
-    - env_file_encoding (str): The encoding of the .env file.
+    - env_file (str): The path to the environment file.
+    - env_file_encoding (str): The encoding of the environment file.
+    - extra (str): How to handle extra fields in the environment file.
 
+    Methods:
+    - __init__: Initializes the Settings object with optional environment file.
+
+    Usage:
+    settings = Settings()
     """
 
     PROJECT_NAME: str
@@ -75,7 +83,12 @@ class Settings(BaseSettings):
 
     FASTAPI: FastAPISettings = FastAPISettings()
     LOGGER: LoggerSettings = LoggerSettings()
-    RAY_SERVE: RayServeSettings = RayServeSettings()
+
+    SERVE_HOST: str = "http://localhost"
+    SERVE_ENDPOINT: str = "googly_serve"
+    SERVE_PORT: int = 8000
+
+    GOOGLY_PATH: str = "assets/googly1.png"
 
     class Config:
         env_file: str = ".env"
@@ -83,12 +96,25 @@ class Settings(BaseSettings):
         extra = "ignore"
 
     def __init__(self, *args, **kwargs):
+        """
+        Initializes the Settings object.
+
+        Args:
+        - _env_file (str): Optional path to an environment file.
+
+        Returns:
+        - None
+
+        Raises:
+        - None
+        """
         super().__init__(*args, **kwargs)
         self._env_file = kwargs.get("_env_file", None)
         if self._env_file:
             print(f"Using environment file: {self._env_file}")
             kwargs["FASTAPI"] = FastAPISettings(_env_file=self._env_file)
             kwargs["LOGGER"] = LoggerSettings(_env_file=self._env_file)
+
             super().__init__(*args, **kwargs)
 
 
