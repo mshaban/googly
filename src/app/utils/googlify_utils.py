@@ -1,5 +1,4 @@
 import numpy as np
-from pydantic import BaseModel, model_validator
 
 from src.app.models.features import EyeModel, FaceModel
 from src.app.models.googly import GooglyModel
@@ -108,10 +107,6 @@ def apply_on_face(
         left_eye_center,
         left_eye_size,
         rotation=left_eye_rotation,
-        opacity=1.0,
-        gamma=2.2,
-        overlay_bias=1.2,
-        min_alpha=0.1,
         overlay_center_x=overlay_center_x,
         overlay_center_y=overlay_center_y,
     )
@@ -132,10 +127,6 @@ def apply_on_face(
         right_eye_center,
         right_eye_size,
         rotation=right_eye_rotation,
-        opacity=1.0,
-        gamma=2.2,
-        overlay_bias=1.2,
-        min_alpha=0.1,
         overlay_center_x=overlay_center_x,
         overlay_center_y=overlay_center_y,
     )

@@ -47,6 +47,11 @@ class LoggerSettings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
 
+class RayServeSettings(BaseSettings):
+    SERVE_URL: str = "http://localhost:8000"
+    SERVE_ENDPOINT: str = "googly"
+
+
 class Settings(BaseSettings):
     """
     A class representing the settings for the application.
@@ -57,6 +62,7 @@ class Settings(BaseSettings):
     - API_VERSION (str): The version of the API.
     - FASTAPI (FastAPISettings): Settings related to the FastAPI framework.
     - LOGGER (LoggerSettings): Settings related to logging.
+    - RAY_SERVE (RayServeSettings): Settings related to Ray Serve.
 
     Configurations:
     - env_file (str): The path to the .env file.
@@ -69,6 +75,7 @@ class Settings(BaseSettings):
 
     FASTAPI: FastAPISettings = FastAPISettings()
     LOGGER: LoggerSettings = LoggerSettings()
+    RAY_SERVE: RayServeSettings = RayServeSettings()
 
     class Config:
         env_file: str = ".env"

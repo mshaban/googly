@@ -5,8 +5,6 @@ from PIL import Image
 
 from src.app.core.enums import ImageFormatEnum
 
-from src.app.models.features import FaceModel, EyeModel
-
 
 def save_image_from_bytes(image_bytes: bytes, file_path: str) -> None:
     """
@@ -20,7 +18,7 @@ def save_image_from_bytes(image_bytes: bytes, file_path: str) -> None:
         image_file.write(image_bytes)
 
 
-def save_image_from_array(image_array: np.ndarray, file_path: str) -> None:
+def get_image_from_array(image_array: np.ndarray) -> Image.Image:
     """
     Saves an image array to a file, converting from BGR to RGB format if necessary.
 
@@ -39,7 +37,7 @@ def save_image_from_array(image_array: np.ndarray, file_path: str) -> None:
         image_array = np.clip(image_array, 0, 255).astype(np.uint8)
 
     image = Image.fromarray(image_array)
-    image.save(file_path)
+    return image
 
 
 def get_image_format_from_bytes(image_bytes: bytes) -> ImageFormatEnum:

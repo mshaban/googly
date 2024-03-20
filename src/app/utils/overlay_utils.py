@@ -69,6 +69,7 @@ def rotate_overlay(overlay_img, rotation, center_x, center_y):
     if rotation != 0.0:
         overlay_rotated = rotate(overlay_img, rotation, reshape=True, mode="nearest")
         # Recalculate the center as the image shape may change
+        # TODO: Fix the center calculation
         center_x, center_y = (
             overlay_rotated.shape[1] // 2,
             overlay_rotated.shape[0] // 2,
@@ -147,10 +148,17 @@ def calculate_overlay_position(
 
 
 def blend_overlay(
-    background_img, overlay_img, start_x, start_y, alpha_channel, gamma, overlay_bias
+    background_img,
+    overlay_img,
+    start_x,
+    start_y,
+    opacity,
+    gamma,
+    overlay_bias,
+    min_alpha=0.1,
 ):
     """
-    Blend the overlay image onto the background image at a specified position, considering the alpha channel,
+    Blend the overlay image onto the background image at a specified position, considering the adjusted alpha channel,
     gamma correction, and overlay bias for blending.
 
     Parameters:
@@ -158,40 +166,47 @@ def blend_overlay(
     - overlay_img: np.array, Overlay (transparent) image array.
     - start_x: int, X coordinate of the top-left corner to start overlaying.
     - start_y: int, Y coordinate of the top-left corner to start overlaying.
-    - alpha_channel: np.array, Adjusted alpha channel for the overlay.
+    - opacity: float, Opacity level of the overlay [0.0, 1.0].
     - gamma: float, Gamma correction factor.
     - overlay_bias: float, Blending bias towards the overlay [0.0, 1.0].
+    - min_alpha: float, Minimum alpha value to ensure visibility of the overlay.
 
     Returns:
     - np.array: Background image array with the overlay blended onto it.
     """
+    # Adjust the alpha channel of the overlay image
+    adjusted_alpha_channel = adjust_alpha_channel(overlay_img, opacity, min_alpha)
+
     # Extract the color channels of the overlay image
     overlay_color = overlay_img[:, :, :3]
 
-    # Determine the region of the background to be blended with the overlay
+    # Use the adjusted alpha channel for blending
+    alpha_mask_resized = adjusted_alpha_channel
+
+    # Isolate the overlay and background areas to be blended
     background_roi = background_img[
         start_y : start_y + overlay_color.shape[0],
         start_x : start_x + overlay_color.shape[1],
     ]
 
-    # Apply gamma correction
+    # Apply gamma correction to both overlay and background
     overlay_linear = np.power(overlay_color.astype(np.float32) / 255.0, gamma)
     background_linear = np.power(background_roi.astype(np.float32) / 255.0, gamma)
 
-    # Compute the blended image
-    alpha_foreground = alpha_channel * overlay_bias
+    # Blend using the adjusted alpha
     blended_linear = (
-        alpha_foreground * overlay_linear + (1 - alpha_foreground) * background_linear
+        alpha_mask_resized * overlay_linear
+        + (1 - alpha_mask_resized) * background_linear
     )
 
     # Apply inverse gamma correction
     blended = np.power(blended_linear, 1 / gamma) * 255.0
     blended_clipped = np.clip(blended, 0, 255).astype(np.uint8)
 
-    # Place the blended image back into the background image
+    # Update the background image with the blended overlay
     background_img[
-        start_y : start_y + overlay_color.shape[0],
-        start_x : start_x + overlay_color.shape[1],
+        start_y : start_y + blended_clipped.shape[0],
+        start_x : start_x + blended_clipped.shape[1],
     ] = blended_clipped
 
     return background_img
@@ -203,10 +218,10 @@ def overlay_transparent(
     position,
     size,
     rotation=0.0,
-    opacity=1.0,
-    gamma=1.0,
-    overlay_bias=0.9,
-    min_alpha=0.1,
+    opacity=0.7,
+    gamma=1.4,
+    overlay_bias=0.5,
+    min_alpha=0.0,
     overlay_center_x=None,
     overlay_center_y=None,
 ):
@@ -238,7 +253,6 @@ def overlay_transparent(
     overlay_rotated, new_center_x, new_center_y = rotate_overlay(
         overlay_resized, rotation, new_center_x, new_center_y
     )
-    alpha_channel = adjust_alpha_channel(overlay_rotated, opacity, min_alpha)
     start_x, start_y = calculate_overlay_position(
         position,
         new_center_x,
@@ -251,8 +265,9 @@ def overlay_transparent(
         overlay_rotated,
         start_x,
         start_y,
-        alpha_channel,
+        opacity,
         gamma,
         overlay_bias,
+        min_alpha,
     )
     return background_img
