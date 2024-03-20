@@ -1,8 +1,8 @@
 import json
 import logging
 
-from app.models.features import EyeModel, FaceModel
-from app.models.image import ImageModel
+from src.app.models.features import EyeModel, FaceModel
+from src.app.models.image import ImageModel
 from fastapi.requests import Request
 from ray import serve
 from ray.serve.handle import DeploymentHandle, DeploymentResponse

@@ -2,8 +2,8 @@ import io
 
 import aiohttp
 import numpy as np
-from app.core.enums import ImageFormatEnum
-from app.utils.image_utils import (
+from src.app.core.enums import ImageFormatEnum
+from src.app.utils.image_utils import (
     get_image_format_from_bytes,
     get_image_from_array,
     image_path_to_bytes,

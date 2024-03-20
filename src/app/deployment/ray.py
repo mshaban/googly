@@ -1,4 +1,4 @@
-from app.core.deploy import (
+from src.app.core.deploy import (
     CompositeModelServe,
     VinoEyeInferModelServe,
     VinoFaceInferModelServe,
