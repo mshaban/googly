@@ -3,7 +3,6 @@ from pydantic import BaseModel, model_validator
 
 from src.app.models.features import EyeModel, FaceModel
 from src.app.models.googly import GooglyModel
-from src.app.models.image import ImageModel
 from src.app.utils.eye_utils import (
     calculate_eye_rotation,
     calculate_googly_center_and_size,
@@ -15,30 +14,27 @@ from src.app.utils.overlay_utils import (
 
 
 @staticmethod
-def apply_googly_eyes(googly: GooglyModel):
+def apply_googly_eyes(
+    googly: GooglyModel, overlay_center_x=195, overlay_center_y=210
+) -> np.ndarray:
     """
-    Apply googly eyes to the input image.
-
-    This function takes the input image and overlays googly eyes on the detected eye regions.
-    It first loads the input image and the googly eye images from bytes.
-    It then iterates over the detected eye regions, calculates the center and size of the googly eye,
-    and the rotation angle based on the eye coordinates.
-    The googly eye image is then overlaid on the input image at the calculated center with the specified size and rotation.
-    The opacity, gamma, overlay bias, and minimum alpha values can also be adjusted for the overlay.
+    Apply googly eyes to the input image based on the provided GooglyModel.
 
     Parameters:
-    - self: The instance of the class containing the input image, googly eye images, and eye regions.
+    googly (GooglyModel): A data model containing information about the input image, googly eyes, faces, and overlay details.
+    overlay_center_x (int): The x-coordinate of the center of the googly eye overlay. Default is 195.
+    overlay_center_y (int): The y-coordinate of the center of the googly eye overlay. Default is 210.
 
     Returns:
-    - input_img: The modified image with googly eyes overlaid on the detected eye regions.
+    np.ndarray: The input image with googly eyes applied.
 
     Raises:
-    - ValueError: If the input image or googly eye images cannot be loaded.
-    - IndexError: If there are not enough googly eye images for all detected eye regions.
+    ValueError: If the input image data or googly eye data is invalid.
+    IndexError: If there are not enough eyes or faces provided in the GooglyModel.
     """
-    input_img = load_image_from_bytes(googly.input_image.data)  # Load the main image
+
+    input_img = load_image_from_bytes(googly.input_image.data)
     input_image_size = input_img.shape[:2]
-    overlay_center_x, overlay_center_y = 195, 210
 
     googly_eye_img = load_image_from_bytes(googly.googly.data, with_alpha=True)
 
@@ -66,26 +62,34 @@ def apply_on_face(
     googly_eye_img: np.ndarray,
     overlay_center_x: int,
     overlay_center_y: int,
-):
+) -> np.ndarray:
     """
-    Apply googly eyes on the detected face.
-    This function takes the detected face and eye regions and applies googly eyes on the eyes.
-    It calculates the center and size of the googly eye based on the eye coordinates and face features.
-    The rotation angle of the eye is also calculated to align the googly eye correctly.
-    The googly eye image is then overlaid on the input image at the calculated center with the specified size and rotation.
+    Apply googly eyes on a face image.
+
     Parameters:
-    - self: The instance of the class containing the input image, googly eye images, and eye regions.
-    - face_model: The FaceModel object representing the detected face.
-    - eye_model: The EyeModel object representing the detected eye.
+    - face_model (FaceModel): The model representing the face in the image.
+    - eyes (list[EyeModel]): List of EyeModel objects representing the eyes in the image.
+    - input_img (np.ndarray): The input image on which to apply the googly eyes.
+    - input_image_size (tuple[int, int]): The size of the input image (width, height).
+    - googly_eye_img (np.ndarray): The image of the googly eyes to overlay on the face.
+    - overlay_center_x (int): The x-coordinate of the center of the overlay.
+    - overlay_center_y (int): The y-coordinate of the center of the overlay.
+
     Returns:
-    - input_img: The modified image with googly eyes overlaid on the detected eye regions.
+    - np.ndarray: The image with googly eyes applied.
+
     Raises:
-    - ValueError: If the input image or googly eye images cannot be loaded.
-    - IndexError: If there are not enough googly eye images for all detected eye regions.
+    - ValueError: If the number of eyes provided is not equal to 2.
+    - TypeError: If any of the input parameters are of incorrect type.
+
+    This function applies googly eyes on the input image by calculating the properties for each eye, including center, size, and rotation.
+    It then overlays the googly eyes on the input image for both eyes and returns the resulting image.
     """
+
+    if len(eyes) != 2:
+        raise ValueError("Exactly 2 eyes are required for applying googly eyes.")
+
     # Correct the assignment of the right eye model
-    left_eye_model = eyes[0]
-    right_eye_model = eyes[1]
     left_eye_model, right_eye_model = eyes
 
     # Calculate properties for the left eye
@@ -112,10 +116,10 @@ def apply_on_face(
         overlay_center_y=overlay_center_y,
     )
 
+    # Calculate properties for the right eye
     right_eye_center, right_eye_size = calculate_googly_center_and_size(
         right_eye_model, face_model, input_image_size
     )
-    # Calculate properties for the right eye
     right_eye_rotation = calculate_eye_rotation(
         left_corner=(right_eye_model.points[0].x, right_eye_model.points[0].y),
         right_corner=(right_eye_model.points[1].x, right_eye_model.points[1].y),

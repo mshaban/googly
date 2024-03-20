@@ -22,10 +22,7 @@ def find_centroid(points: list) -> np.ndarray:
     if not points:
         raise ValueError("Input points list is empty")
 
-    # Convert points to numpy array
     points_array = np.array(points)
-
-    # Calculate centroid
     centroid = np.mean(points_array, axis=0).astype(int)
 
     return centroid
@@ -49,6 +46,7 @@ def calculate_eye_rotation(left_corner, right_corner):
     It then calculates the angle of this vector in radians using arctan2, and converts it to degrees using np.degrees.
     The resulting angle in degrees is returned as the output of the function.
     """
+
     vector = np.array(right_corner) - np.array(left_corner)
     angle_radians = np.arctan2(vector[1], vector[0])
     angle_degrees = np.degrees(angle_radians)
@@ -94,11 +92,10 @@ def estimate_eye_size(eye_model):
     ValueError: If the eye_model is empty or does not contain enough points to calculate the size.
     """
 
-    if not eye_model.points:
+    if not eye_model.points or len(eye_model.points) < 2:
         raise ValueError(
-            "The eye_model must contain at least one point to calculate the size."
+            "The eye_model must contain at least two points to calculate the size."
         )
-
     x_coords = [point.x for point in eye_model.points]
     y_coords = [point.y for point in eye_model.points]
     distances = [
@@ -175,7 +172,7 @@ def apply_corrective_shifts(center: tuple, size: int, positive_shift: bool) -> t
     >>> apply_corrective_shifts((5, 5), 10, True)
     (15, 15)
     """
-    shift_factor = 0.0  # Adjust this as needed
+    shift_factor = 0.0
     x_shift = int(shift_factor * size) if positive_shift else -int(shift_factor * size)
     y_shift = int(shift_factor * size) if positive_shift else -int(shift_factor * size)
     corrected_center = (int(center[0]) + x_shift, int(center[1]) + y_shift)
@@ -202,7 +199,6 @@ def calculate_googly_center_and_size(
     - ValueError: If the corrected center x coordinate is outside the face region.
     """
 
-    # Validate image_size
     if not (isinstance(image_size, tuple) and len(image_size) == 2):
         raise ValueError("Image size must be a tuple of two integers.")
 
