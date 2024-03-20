@@ -1,0 +1,6 @@
+{
+  "path": "artifacts/intel/facial-landmarks-35-adas-0002",
+  "precision": "FP32",
+  "xml": "facial-landmarks-35-adas-0002.xml",
+  "bin": "facial-landmarks-35-adas-0002.bin"
+}

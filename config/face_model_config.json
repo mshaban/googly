@@ -1,0 +1,6 @@
+{
+  "path": "artifacts/intel/face-detection-adas-0001",
+  "precision": "FP32",
+  "xml": "face-detection-adas-0001.xml",
+  "bin": "face-detection-adas-0001.bin"
+}
