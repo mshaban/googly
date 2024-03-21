@@ -15,9 +15,7 @@
   <p align="center">
     Googly Eyes photo modification web app.
     <br />
-    <a href="https://github.com/mshaban/googly/issues">Report Bug</a>
-    ·
-    <a href="https://github.com/mshaban/googly/issues">Request Feature</a>
+    <a href="https://trello.com/b/03moddbM/onfido-project">Project Board</a>
   </p>
 </div>
 
@@ -27,9 +25,6 @@
   <ol>
     <li>
       <a href="#about-the-project">About The Project</a>
-      <ul>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
     </li>
     <li>
       <a href="#getting-started">Getting Started</a>
@@ -40,7 +35,6 @@
     </li>
     <li><a href="#usage">Usage</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
-    <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
@@ -63,15 +57,55 @@ enhancing user engagement and satisfaction with FunnyFaces Inc.'s offerings.
 
 ## Getting Started
 
-### Prerequisites
+### Local Development
 
-### Installation
+#### Prerequisites
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+- [pyenv](https://github.com/pyenv/pyenv) for managing Python versions.
+- [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) for creating virtual environments.
+- [pdm](https://github.com/pdm-project/pdm) for Python dependency management.
+- [just cli](https://github.com/casey/just) for task automation.
+
+#### Installation
+
+1. Create Virtual Environment:
+
+```bash
+git clone https://github.com/mshaban/googly.git
+cd googly
+pyenv virtualenv 3.11 googlify
+pyenv local googlify
+```
+
+2. Install Dependencies:
+
+```bash
+# Use -G test for development/test dependencies
+pdm install
+```
+
+3. Running the app
+
+```bash
+
+## Launch FastAPI & Ray Serve
+just run
+## Run tests
+just test
+
+## run fastapi and ray serve separately
+source config/local.env
+uvicorn src.app.deployment.fastapi:app --reload --host ${FAST_HOST} --port ${FAST_PORT} &
+serve run src.app.deployment.ray:app  --port ${SERVE_PORT} --host ${SERVE_URL}
 
 <!-- USAGE EXAMPLES -->
 
-## Usage
+## Having fun...
+
+# Results are stored in `out` directory
+python -m src.runner  "images_dir" # --sample_size 3 // default is all images in directory
+
+```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -79,13 +113,7 @@ enhancing user engagement and satisfaction with FunnyFaces Inc.'s offerings.
 
 ## Roadmap
 
-See the [open issues](https://github.com/mshaban/googly/issues) for a full list of proposed features (and known issues).
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-<!-- CONTRIBUTING -->
-
-## Contributing
+See the [open issues](https://trello.com/b/03moddbM/onfido-project) for a full list of features and known issues.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -109,8 +137,7 @@ Project Link: [https://github.com/mshaban/googly](https://github.com/mshaban/goo
 
 ## Acknowledgments
 
-- []()
-- []()mshaban []()
+- [openvino is amaaazing](https://github.com/openvinotoolkit/openvino)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
