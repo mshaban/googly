@@ -6,7 +6,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/{1:github_username}/{2:repo_name}">
+  <a href="https://github.com/mshaban/googly">
     <img src="assets/googly.png" alt="Logo" width="300" height="200">
   </a>
 
@@ -77,7 +77,7 @@ pyenv virtualenv 3.11 googlify
 pyenv local googlify
 ```
 
-2. Install Dependencies:
+2. Install dependencies:
 
 ```bash
 # Use -G test for development/test dependencies
@@ -87,16 +87,16 @@ pdm install
 3. Running the app
 
 ```bash
+## Launch Ray Serve
+source config/local.env
+serve run src.app.deployment.ray:app  --port ${SERVE_PORT} --host ${SERVE_URL}
 
-## Launch FastAPI & Ray Serve
-just run
+## Launch FastAPI
+just app
 ## Run tests
 just test
-
-## run fastapi and ray serve separately
-source config/local.env
-uvicorn src.app.deployment.fastapi:app --reload --host ${FAST_HOST} --port ${FAST_PORT} &
-serve run src.app.deployment.ray:app  --port ${SERVE_PORT} --host ${SERVE_URL}
+## Run linting
+just lint
 
 <!-- USAGE EXAMPLES -->
 
@@ -105,6 +105,12 @@ serve run src.app.deployment.ray:app  --port ${SERVE_PORT} --host ${SERVE_URL}
 # Results are stored in `out` directory
 python -m src.runner  "images_dir" # --sample_size 3 // default is all images in directory
 
+```
+
+```bash
+# Inside docker container // WIP
+docker build -t googly .
+docker run -p 8000:8000 googly
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
