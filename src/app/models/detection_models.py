@@ -111,7 +111,5 @@ class EyeInferModel(InferenceModel, ABC):
             raise RuntimeError("Error detecting eyes in the image") from e
 
     @abstractmethod
-    def detect(
-        self, img: np.ndarray, face_coordinates: list[FaceModel]
-    ) -> list[EyeModel]:
+    def detect(self, img: np.ndarray, faces: list[FaceModel]) -> list[EyeModel]:
         pass
