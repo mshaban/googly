@@ -1,77 +1,63 @@
+from typing import Any
 from src.app.models.features import FaceModel, EyeModel, PointModel
 from src.app.models.detection_models import EyeInferModel, FaceInferModel
+from src.app.utils.image_utils import batch_process
 from abc import ABC
 import cv2
-from src.app.core.logger import logger
 
 import numpy as np
 
 
 class BaseVinoModel(ABC):
-    def preprocess_image(
-        self, image: np.ndarray, input_shape: tuple[int, int]
-    ) -> np.ndarray:
+    def preprocess_images(
+        self, images: list[np.ndarray], input_shape: tuple[int, int]
+    ) -> np.ndarray[Any, np.dtype[np.float32]]:
         """
-        Preprocesses an image for input into a neural network model.
-
+        Preprocesses a list of images for input into a neural network model in parallel.
         Args:
-            image (np.ndarray): The input image to be preprocessed. It should be a 3D numpy array representing an image.
-            input_shape (Tuple[int, int]): The desired input shape of the image in the format (height, width).
-
+            images (list[np.ndarray]): The list of input images to be
+            preprocessed. Each should be a 3D numpy array representing an image.
+            input_shape (Tuple[int, int]): The desired input shape of the
+            images in the format (height, width).
         Returns:
-            np.ndarray: The preprocessed image ready for input into a neural
-            network model. It will be a 4D numpy array with shape (1, channels,
-            height, width).
-
+            list[np.ndarray]: The list of preprocessed images ready for input
+            into a neural network model. Each will be a 4D numpy array with
+            shape (1, channels, height, width).
         Raises:
-            ValueError: If the input image is not a 3D numpy array.
+            ValueError: If any input image is not a 3D numpy array.
         """
 
-        if image.ndim == 2:
-            image = np.stack([image, image, image], axis=-1)
-        if image.ndim != 3:
-            raise ValueError("Image must be 3D")
+        def preprocess_single_image(image: np.ndarray) -> np.ndarray:
+            if image.ndim == 2:
+                image = np.stack([image, image, image], axis=-1)
+            if image.ndim != 3:
+                raise ValueError("Image must be 3D")
+            input_height, input_width = input_shape
+            image = cv2.resize(image, (input_width, input_height))
+            image = image.transpose((2, 0, 1))
+            return image
 
-        # logger.info(f"image shape {image.shape}")
-        input_height, input_width = input_shape
-        image = cv2.resize(image, (input_width, input_height))
-        image = image.transpose((2, 0, 1))
-        image = np.expand_dims(image, axis=0)
-        return image
+        results = np.array(
+            batch_process(images, preprocess_single_image), dtype=np.float32
+        )
+
+        return results
 
 
 class VinoFaceInferModel(FaceInferModel, BaseVinoModel):
     name: str = "face-detection-adas-0001"
 
     def detect(self, img: np.ndarray) -> list[FaceModel]:
-        """
-        Detect faces in the input image using a pre-trained face detection model.
-
-        Parameters:
-        img (np.ndarray): The input image in the form of a NumPy array.
-
-        Returns:
-        list[FaceModel]: A list of FaceModel objects representing the detected faces in the image.
-
-        Raises:
-        ValueError: If the input image is not a valid NumPy array.
-        RuntimeError: If there is an issue with the face detection model or inference process.
-
-        This method takes an input image and preprocesses it for the face
-        detection model. It then performs inference using the model and filters
-        the detected faces. The bounding box coordinates of the detected faces
-        are calculated based on the input image dimensions and returned as a
-        list of FaceModel objects.
-        """
 
         # Preprocess the image for the face detection model
         face_input_layer, face_output_layer, compiled_face_model = self.artifacts
         target_shape = (face_input_layer.shape[2], face_input_layer.shape[3])
-        preprocessed_image = self.preprocess_image(img, target_shape)
+        preprocessed_images = self.preprocess_images([img], target_shape)
         # logger.info(f"preprocess shape {preprocessed_image.shape}")
 
         # Perform inference
-        results = compiled_face_model([preprocessed_image])[face_output_layer]
+        results = compiled_face_model(preprocessed_images)[face_output_layer]
+        print(results.shape)
         results = self.filter_faces(results[0][0])
 
         # Calculate the bounding box coordinates of the detected faces
@@ -110,97 +96,112 @@ class VinoEyeInferModel(EyeInferModel, BaseVinoModel):
         Detects eyes in the given image based on the provided face coordinates.
 
         Parameters:
-        img (np.ndarray): The input image in which eyes are to be detected.
-        face_coordinates (list[FaceModel]): A list of FaceModel objects representing the coordinates of faces in the image.
+        img (np.ndarray): The input image in which to detect eyes.
+        face_coordinates (list[FaceModel]): A list of FaceModel objects
+        representing the coordinates of faces.
 
         Returns:
-        list[EyeModel]: A list of EyeModel objects representing the detected eyes in the image.
+        list[EyeModel]: A list of EyeModel objects representing the detected eyes.
 
         Raises:
         None
 
-        This method takes an input image and a list of face coordinates, and
-        uses a pre-trained eye detection model to detect eyes in the image. It
-        returns a list of EyeModel objects representing the detected eyes. The
-        method internally uses helper functions to extract eyes from the faces
-        based on the provided face coordinates.
+        This method takes an input image and a list of face coordinates,
+        extracts the face regions from the image, preprocesses them, and then
+        predicts the eyes for each face in a single call. The predicted eyes
+        are returned as a list of EyeModel objects.
         """
-
         eye_input_layer, eye_output_layer, compiled_eye_model = self.artifacts
         target_shape = (eye_input_layer.shape[2], eye_input_layer.shape[3])
 
-        # Get the eyes for each face
-        eyes = [
-            face_eyes
-            for fc in face_coordinates
-            for face_eyes in self.get_eyes(
-                img, fc, eye_output_layer, compiled_eye_model, target_shape
-            )
-        ]
+        # Collect all face regions
+        face_regions = self.extracti
+        # Preprocess all face regions in a batch
+        preprocessed_faces = self.preprocess_images(face_regions, target_shape)
+        faces = self.preprocess_images(process_,)
 
-        return eyes
+        # Predict eyes for all faces in a single call
+        eyes_batch = self.get_eyes(
+            preprocessed_faces, eye_output_layer, compiled_eye_model, face_coordinates
+        )
+        return eyes_batch
+
+    def extract_face_region(self, img: np.ndarray, fc: FaceModel) -> np.ndarray:
+        def get_face()
+        batch_process(
+            [(img, fc) for fc in face_coordinates], self.extract_face_region
+        )
+
+        xmin, ymin, xmax, ymax = fc.coordinates
+        return img[ymin:ymax, xmin:xmax]
 
     def get_eyes(
         self,
-        img: np.ndarray,
-        fc: FaceModel,
+        preprocessed_faces: np.ndarray,
         eye_output_layer: int,
         compiled_eye_model,
-        target_shape: tuple[int, int],
-    ) -> tuple[EyeModel, EyeModel]:
+        face_coordinates: list[FaceModel],
+    ) -> list[EyeModel]:
         """
-        Extracts the coordinates of the left and right eyes from a given image.
+        Extracts eye landmarks from preprocessed faces using a compiled eye model.
 
         Parameters:
-        - img: The input image as a numpy array.
-        - fc: The coordinates of the detected face in the image.
-        - eye_output_layer: The index of the output layer for the eye model.
-        - compiled_eye_model: The compiled eye model for predicting eye coordinates.
-        - target_shape: The target shape for preprocessing the face region.
+        - preprocessed_faces (np.ndarray): An array of preprocessed face images.
+        - eye_output_layer (int): The output layer index for the eye landmarks in the compiled eye model.
+        - compiled_eye_model: The compiled eye model used for landmark extraction.
+        - face_coordinates (list[FaceModel]): A list of FaceModel objects containing face coordinates.
 
         Returns:
-        - Tuple[EyeModel, EyeModel]: A tuple containing the left and right EyeModel objects representing the detected eyes.
+        - list[EyeModel]: A list of EyeModel objects representing the extracted eye landmarks.
 
         Raises:
         - None
 
-        This function takes the input image, extracts the face region based on the detected face coordinates,
-        preprocesses the face region, and uses the compiled eye model to predict the eye coordinates.
-        The predicted coordinates are then transformed to the actual image coordinates and used to create
-        EyeModel objects for the left and right eyes, which are returned as a tuple.
+        This function processes preprocessed face images to extract eye
+        landmarks using a compiled eye model. It iterates over the face
+        coordinates provided, calculates the eye landmarks based on the model
+        output, and constructs EyeModel objects for the left and right eyes.
+        The resulting EyeModel objects are then returned as a list.
         """
-        # Extract the face region from the image
-        xmin, ymin, xmax, ymax = fc.coordinates
-        face_width = xmax - xmin
-        face_height = ymax - ymin
-        face_region = img[ymin:ymax, xmin:xmax]
 
-        # Preprocess the face region for the eye model
-        preprocessed_face = self.preprocess_image(face_region, target_shape)
-        results = compiled_eye_model([preprocessed_face])[eye_output_layer]
-        results = results[0].reshape(-1, 2)
+        results = compiled_eye_model(preprocessed_faces)[eye_output_layer]
+        print(results.shape)
 
-        left_eye_indices = [0, 1]  # Corners of the left eye
-        right_eye_indices = [2, 3]  # Corners of the right eye
-        left_eyebrow_indices = [12, 13, 14]  # Points for the left eyebrow
-        right_eyebrow_indices = [15, 16, 17]  # Points for the right eyebrow
+        results = results.reshape(results.shape[0], -1, 2)
+        print(results.shape)
+        print(len(face_coordinates))
+        eye_batches = batch_process(
+            [(rs, fc.coordinates) for rs, fc in zip(results, face_coordinates)],
+            self.create_eye_model,
+        )
+        return eye_batches
 
-        # Helper function to create PointModels
-        def create_point_models(indices):
-            return [
+    def create_eye_model(self, result, face_coords):
+
+        def eye_model(indices):
+            points = [
                 PointModel(
-                    x=int(results[i][0] * face_width + xmin),
-                    y=int(results[i][1] * face_height + ymin),
+                    x=int(result[j][0] * face_width + xmin),
+                    y=int(result[j][1] * face_height + ymin),
                 )
-                for i in indices
+                for j in indices
             ]
 
-        # Construct EyeModels with eyebrow points
-        left_eye_model = EyeModel(
-            points=create_point_models(left_eye_indices + left_eyebrow_indices)
-        )
-        right_eye_model = EyeModel(
-            points=create_point_models(right_eye_indices + right_eyebrow_indices)
-        )
+            return EyeModel(points=points)
+
+        result = result.reshape(-1, 2)
+        xmin, ymin, xmax, ymax = face_coords
+        face_width = xmax - xmin
+        face_height = ymax - ymin
+        # Define indices for left and right eyes and eyebrows
+        eye_and_eyebrow_indices = {
+            "left": [0, 1, 12, 13, 14],  # 0, 1 for eyes and 12-14 for eyebrows
+            "right": [2, 3, 15, 16, 17],  # 2, 3 for eyes and 15-17 for eyebrows
+        }
+
+        left_eye_model = eye_model(eye_and_eyebrow_indices["left"])
+        right_eye_model = eye_model(eye_and_eyebrow_indices["right"])
 
         return left_eye_model, right_eye_model
+
+    # Function to create PointModels for eyes and eyebrows
