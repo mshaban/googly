@@ -78,6 +78,6 @@ def batch_process(
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(process_item, item) for item in items]
-        processed_items = [future.result() for future in as_completed(futures)]
+        processed_items = [future.result() for future in futures]
 
     return processed_items
