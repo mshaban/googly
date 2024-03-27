@@ -1,11 +1,13 @@
-from typing import Any
-from src.app.models.features import FaceModel, EyeModel, PointModel
-from src.app.models.detection_models import EyeInferModel, FaceInferModel
-from src.app.utils.image_utils import batch_process
 from abc import ABC
-import cv2
+from typing import Any
 
+import cv2
 import numpy as np
+
+from src.app.core.logger import logger
+from src.app.models.detection_models import EyeInferModel, FaceInferModel
+from src.app.models.features import EyeModel, FaceModel, PointModel
+from src.app.utils.model_utils import batch_process, batch_vector_generator
 
 
 class BaseVinoModel(ABC):
@@ -50,14 +52,19 @@ class VinoFaceInferModel(FaceInferModel, BaseVinoModel):
     def detect(self, img: np.ndarray) -> list[FaceModel]:
 
         # Preprocess the image for the face detection model
-        face_input_layer, face_output_layer, compiled_face_model = self.artifacts
+        face_input_layer, face_output_layer, compiled_face_model = (
+            self.artifacts.input_layer,
+            self.artifacts.output_layer,
+            self.artifacts.compiled_model,
+        )
         target_shape = (face_input_layer.shape[2], face_input_layer.shape[3])
         preprocessed_images = self.preprocess_images([img], target_shape)
-        # logger.info(f"preprocess shape {preprocessed_image.shape}")
 
         # Perform inference
+        batch_size = face_input_layer.shape[0]
+        n_samples = 1
+        # padded_images = pad_vector(preprocessed_images, batch_size - n_samples)
         results = compiled_face_model(preprocessed_images)[face_output_layer]
-        print(results.shape)
         results = self.filter_faces(results[0][0])
 
         # Calculate the bounding box coordinates of the detected faces
@@ -73,7 +80,7 @@ class VinoFaceInferModel(FaceInferModel, BaseVinoModel):
         ]
         return faces
 
-    def filter_faces(self, faces, threshold=0.5):
+    def filter_faces(self, faces: list, threshold=0.5):
         """
         Filter out faces with confidence scores below a given threshold.
         Parameters:
@@ -89,9 +96,7 @@ class VinoFaceInferModel(FaceInferModel, BaseVinoModel):
 class VinoEyeInferModel(EyeInferModel, BaseVinoModel):
     name: str = "facial-landmarks-35-adas-0002"
 
-    def detect(
-        self, img: np.ndarray, face_coordinates: list[FaceModel]
-    ) -> list[EyeModel]:
+    def detect(self, img: np.ndarray, faces: list[FaceModel]) -> list[EyeModel]:
         """
         Detects eyes in the given image based on the provided face coordinates.
 
@@ -111,88 +116,78 @@ class VinoEyeInferModel(EyeInferModel, BaseVinoModel):
         predicts the eyes for each face in a single call. The predicted eyes
         are returned as a list of EyeModel objects.
         """
-        eye_input_layer, eye_output_layer, compiled_eye_model = self.artifacts
+        eye_input_layer, eye_output_layer, compiled_eye_model = (
+            self.artifacts.input_layer,
+            self.artifacts.output_layer,
+            self.artifacts.compiled_model,
+        )
+        batch_size = eye_input_layer.shape[0]
         target_shape = (eye_input_layer.shape[2], eye_input_layer.shape[3])
 
         # Collect all face regions
-        face_regions = self.extracti
+        face_regions = self.extract_face_region(img, faces)
+
         # Preprocess all face regions in a batch
         preprocessed_faces = self.preprocess_images(face_regions, target_shape)
-        faces = self.preprocess_images(process_,)
 
-        # Predict eyes for all faces in a single call
-        eyes_batch = self.get_eyes(
-            preprocessed_faces, eye_output_layer, compiled_eye_model, face_coordinates
-        )
-        return eyes_batch
+        # Patch detected faces
+        batched_results = []
+        for ixb, batch in enumerate(
+            batch_vector_generator(preprocessed_faces, batch_size)
+        ):
+            batch_faces = faces[ixb * batch_size : (ixb + 1) * batch_size]
+            eyes_batch = self.get_eyes(
+                batch, eye_output_layer, compiled_eye_model, batch_faces
+            )
+            batched_results.extend(eyes_batch)
 
-    def extract_face_region(self, img: np.ndarray, fc: FaceModel) -> np.ndarray:
-        def get_face()
-        batch_process(
-            [(img, fc) for fc in face_coordinates], self.extract_face_region
-        )
+        return batched_results
 
-        xmin, ymin, xmax, ymax = fc.coordinates
-        return img[ymin:ymax, xmin:xmax]
+    def extract_face_region(
+        self, img: np.ndarray, faces: list[FaceModel]
+    ) -> list[np.ndarray]:
+        def get_face(img, face_coordinates):
+            xmin, ymin, xmax, ymax = face_coordinates
+            return img[ymin:ymax, xmin:xmax]
+
+        face_images = batch_process([(img, fc.coordinates) for fc in faces], get_face)
+
+        return face_images
 
     def get_eyes(
         self,
         preprocessed_faces: np.ndarray,
         eye_output_layer: int,
         compiled_eye_model,
-        face_coordinates: list[FaceModel],
+        faces: list[FaceModel],
     ) -> list[EyeModel]:
-        """
-        Extracts eye landmarks from preprocessed faces using a compiled eye model.
-
-        Parameters:
-        - preprocessed_faces (np.ndarray): An array of preprocessed face images.
-        - eye_output_layer (int): The output layer index for the eye landmarks in the compiled eye model.
-        - compiled_eye_model: The compiled eye model used for landmark extraction.
-        - face_coordinates (list[FaceModel]): A list of FaceModel objects containing face coordinates.
-
-        Returns:
-        - list[EyeModel]: A list of EyeModel objects representing the extracted eye landmarks.
-
-        Raises:
-        - None
-
-        This function processes preprocessed face images to extract eye
-        landmarks using a compiled eye model. It iterates over the face
-        coordinates provided, calculates the eye landmarks based on the model
-        output, and constructs EyeModel objects for the left and right eyes.
-        The resulting EyeModel objects are then returned as a list.
-        """
 
         results = compiled_eye_model(preprocessed_faces)[eye_output_layer]
-        print(results.shape)
-
         results = results.reshape(results.shape[0], -1, 2)
-        print(results.shape)
-        print(len(face_coordinates))
         eye_batches = batch_process(
-            [(rs, fc.coordinates) for rs, fc in zip(results, face_coordinates)],
+            [(rs, fc) for rs, fc in zip(results, faces)],
             self.create_eye_model,
         )
+
         return eye_batches
 
-    def create_eye_model(self, result, face_coords):
+    def create_eye_model(self, eyes_result, face: FaceModel):
 
         def eye_model(indices):
+            logger.debug(f"Indices: {indices}")
+            logger.debug(f"Eyes Result: {eyes_result[indices[0]]}")
             points = [
                 PointModel(
-                    x=int(result[j][0] * face_width + xmin),
-                    y=int(result[j][1] * face_height + ymin),
+                    x=int(eyes_result[j][0] * face_width + xmin),
+                    y=int(eyes_result[j][1] * face_height + ymin),
                 )
                 for j in indices
             ]
-
             return EyeModel(points=points)
 
-        result = result.reshape(-1, 2)
-        xmin, ymin, xmax, ymax = face_coords
-        face_width = xmax - xmin
-        face_height = ymax - ymin
+        xmin, ymin, xmax, ymax = face.coordinates
+        face_width = face.width
+        face_height = face.height
         # Define indices for left and right eyes and eyebrows
         eye_and_eyebrow_indices = {
             "left": [0, 1, 12, 13, 14],  # 0, 1 for eyes and 12-14 for eyebrows
@@ -201,7 +196,13 @@ class VinoEyeInferModel(EyeInferModel, BaseVinoModel):
 
         left_eye_model = eye_model(eye_and_eyebrow_indices["left"])
         right_eye_model = eye_model(eye_and_eyebrow_indices["right"])
+        # Log everything in this func to debug
+        logger.debug(f"Face: {face}")
+        logger.debug(f"Left Eye: {left_eye_model}")
+        logger.debug(f"Right Eye: {right_eye_model}")
+        logger.debug(f"Face Width: {face_width}")
+        logger.debug(f"Face Height: {face_height}")
 
-        return left_eye_model, right_eye_model
+        return left_eye_model, right_eye_model, face
 
     # Function to create PointModels for eyes and eyebrows
