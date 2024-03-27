@@ -1,9 +1,5 @@
-from pydantic import BaseModel, validator, root_validator
+from pydantic import BaseModel, validator
 from pydantic import Base64Bytes
-import numpy as np
-import cv2
-from PIL import Image
-from io import BytesIO
 
 import base64
 

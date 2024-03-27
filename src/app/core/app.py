@@ -23,4 +23,3 @@ class GooglyApp(FastAPI):
     def _setup_routers(self):
         for rt in self._routers_list:
             self.include_router(rt)
-        print("###############")

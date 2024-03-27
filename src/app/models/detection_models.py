@@ -7,12 +7,13 @@ from pydantic import BaseModel
 from src.app.core.logger import logger
 from src.app.models.features import EyeModel, FaceModel
 from src.app.models.image import ImageModel
+from src.app.models.model_registery import ModelArtifacts
 from src.app.utils.image_utils import load_image_from_bytes
 
 
 class InferenceModel(ABC, BaseModel):
     name: str
-    artifacts: Optional[Any]
+    artifacts: ModelArtifacts
 
     class Config:
         arbitrary_types_allowed = True

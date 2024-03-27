@@ -21,14 +21,19 @@ class ModelRegistry:
 
 
 class ModelArtifacts:
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str, batch_size: int):
         self.model_artifacts = self.load_config(config_path)
+        self.batch_size = batch_size
+        self.compiled_model = None
+        self.input_layer = None
+        self.output_layer = None
+        self.setup_artifacts()
 
     def load_config(self, config_path: str) -> dict:
         with open(config_path, "r") as config_file:
             return json.load(config_file)
 
-    def setup_artifacts(self) -> tuple:
+    def setup_artifacts(self):
         ie = Core()
         model_path = Path(self.model_artifacts["path"])
         precision = self.model_artifacts["precision"]
@@ -36,9 +41,15 @@ class ModelArtifacts:
         bin_path = model_path / precision / self.model_artifacts["bin"]
 
         model = ie.read_model(model=xml_path, weights=bin_path)
-        compiled_model = ie.compile_model(model=model)
 
-        input_layer = next(iter(compiled_model.inputs))
-        output_layer = next(iter(compiled_model.outputs))
+        input_layer = next(iter(model.inputs))
+        input_shape = input_layer.shape
+        # Convert input_shape to a list and update the batch size
+        input_shape = list(input_shape)
+        input_shape[0] = self.batch_size
+        # Reshape the model using a compatible type for the new shape
+        model.reshape({input_layer.any_name: input_shape})
+        self.compiled_model = ie.compile_model(model=model)
 
-        return input_layer, output_layer, compiled_model
+        self.input_layer = next(iter(self.compiled_model.inputs))
+        self.output_layer = next(iter(self.compiled_model.outputs))

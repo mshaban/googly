@@ -2,20 +2,20 @@ import io
 
 import aiohttp
 import numpy as np
-from src.app.core.enums import ImageFormatEnum
-from src.app.utils.image_utils import (
-    get_image_format_from_bytes,
-    get_image_from_array,
-    image_path_to_bytes,
-)
 from fastapi import File, UploadFile
 from fastapi.responses import StreamingResponse
 
+from src.app.core.enums import ImageFormatEnum
 from src.app.core.logger import logger
 from src.app.core.settings import settings
 from src.app.models.googly import GooglyModel
 from src.app.models.image import ImageModel
 from src.app.utils.googlify_utils import apply_googly_eyes
+from src.app.utils.image_utils import (
+    get_image_format_from_bytes,
+    get_image_from_array,
+    image_path_to_bytes,
+)
 
 
 async def create_image_model(image: UploadFile = File(...)) -> ImageModel:
